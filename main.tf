@@ -40,7 +40,7 @@ module "backend_ec2" {
 
   # Application configuration
   jwt_secret  = var.jwt_secret
-  cors_origin = "*"  # Allow all origins to avoid circular dependency
+  cors_origin = "*" # Allow all origins to avoid circular dependency
   aws_region  = var.aws_region
   s3_bucket   = module.s3.bucket_name
 

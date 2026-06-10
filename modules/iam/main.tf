@@ -41,7 +41,7 @@ resource "aws_iam_policy" "s3_policy" {
 
 resource "aws_iam_role_policy_attachment" "attach_policy" {
 
-  role       = aws_iam_role.ec2_role.name
+  role = aws_iam_role.ec2_role.name
 
   policy_arn = aws_iam_policy.s3_policy.arn
 }

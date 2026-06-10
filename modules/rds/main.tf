@@ -20,7 +20,7 @@ resource "aws_db_instance" "mysql" {
   instance_class = "db.t3.micro"
 
   allocated_storage = 20
-  storage_type       = "gp2"
+  storage_type      = "gp2"
 
   db_name  = "talentforge"
   username = "admin"

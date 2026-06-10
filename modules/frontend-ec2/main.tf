@@ -18,10 +18,10 @@ data "aws_ami" "ubuntu" {
 
 resource "aws_instance" "frontend" {
 
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t2.micro"
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t2.micro"
 
-  subnet_id              = var.public_subnet_id
+  subnet_id = var.public_subnet_id
 
   key_name = var.key_name
 
