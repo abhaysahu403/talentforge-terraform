@@ -1,5 +1,5 @@
 module "vpc" {
-  source = "./talentforge-terraform/modules/vpc"
+  source = "./modules/vpc"
 
   project_name          = var.project_name
   vpc_cidr              = "10.0.0.0/16"
@@ -11,7 +11,7 @@ module "vpc" {
 }
 
 module "security_groups" {
-  source = "./talentforge-terraform/modules/security-groups"
+  source = "./modules/security-groups"
 
   project_name = var.project_name
   vpc_id       = module.vpc.vpc_id
@@ -19,13 +19,13 @@ module "security_groups" {
 
 module "iam" {
 
-  source = "./talentforge-terraform/modules/iam"
+  source = "./modules/iam"
 
   project_name = var.project_name
 }
 
 module "frontend_ec2" {
-  source = "./talentforge-terraform/modules/frontend-ec2"
+  source = "./modules/frontend-ec2"
 
   project_name          = var.project_name
   public_subnet_id      = module.vpc.public_subnet_id
@@ -36,7 +36,7 @@ module "frontend_ec2" {
 }
 
 module "backend_ec2" {
-  source = "./talentforge-terraform/modules/backend-ec2"
+  source = "./modules/backend-ec2"
 
   project_name          = var.project_name
   public_subnet_id      = module.vpc.public_subnet_id
@@ -45,7 +45,7 @@ module "backend_ec2" {
 }
 
 module "rds" {
-  source = "./talentforge-terraform/modules/rds"
+  source = "./modules/rds"
 
   project_name        = var.project_name
   private_subnet_a_id = module.vpc.private_subnet_a_id
@@ -54,7 +54,7 @@ module "rds" {
 }
 
 module "s3" {
-  source = "./talentforge-terraform/modules/s3"
+  source = "./modules/s3"
 
   project_name = var.project_name
 }
