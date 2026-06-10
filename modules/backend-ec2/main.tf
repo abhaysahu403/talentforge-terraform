@@ -23,35 +23,14 @@ resource "aws_instance" "backend" {
     Name = "${var.project_name}-backend"
   }
 
-  user_data = <<-EOF
-#!/bin/bash
-
-exec > /var/log/userdata.log 2>&1
-
-echo "Starting Backend Setup"
-
-apt update -y
-
-apt install docker.io git -y
-
-systemctl start docker
-systemctl enable docker
-
-cd /home/ubuntu
-
-git clone https://github.com/abhaysahu403/talentforge-backend.git
-
-cd talentforge-backend
-
-docker build -t talentforge-backend .
-
-docker run -d \
---name talentforge-backend \
--p 5000:5000 \
---restart always \
-talentforge-backend
-
-echo "Backend Setup Complete"
-
-EOF
+  user_data = templatefile("${path.module}/userdata-automated.sh", {
+    db_host     = var.db_host
+    db_user     = var.db_user
+    db_password = var.db_password
+    db_name     = var.db_name
+    jwt_secret  = var.jwt_secret
+    cors_origin = var.cors_origin
+    aws_region  = var.aws_region
+    s3_bucket   = var.s3_bucket
+  })
 }

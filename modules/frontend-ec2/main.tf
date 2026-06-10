@@ -33,7 +33,9 @@ resource "aws_instance" "frontend" {
 
   associate_public_ip_address = true
 
-  user_data = file("${path.module}/userdata.sh")
+  user_data = templatefile("${path.module}/userdata-automated.sh", {
+    backend_ip = var.backend_ip
+  })
 
   tags = {
     Name = "${var.project_name}-frontend"

@@ -1,0 +1,187 @@
+name: Terraform Deploy
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:  # Manual trigger
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: 1.5.0
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Format Check
+        run: terraform fmt -check
+        continue-on-error: true
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
+            -out=tfplan
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: tfplan
+          retention-days: 5
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production  # Requires approval if configured
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+
+      - name: Terraform Apply
+        run: |
+          terraform apply \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
+            -auto-approve
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+
+      - name: Get Terraform Outputs
+        id: outputs
+        run: |
+          echo "frontend_ip=$(terraform output -raw frontend_public_ip)" >> $GITHUB_OUTPUT
+          echo "backend_ip=$(terraform output -raw backend_public_ip)" >> $GITHUB_OUTPUT
+
+      - name: Display Deployment Info
+        run: |
+          echo "🎉 Deployment Complete!"
+          echo "Frontend URL: http://${{ steps.outputs.outputs.frontend_ip }}"
+          echo "Backend API: http://${{ steps.outputs.outputs.backend_ip }}:5000"
+          echo ""
+          echo "Login with: admin@talentforge.com / Password123"
+
+      - name: Create Deployment Summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🚀 Deployment Successful
+          
+          ### Access Information
+          - **Frontend**: http://${{ steps.outputs.outputs.frontend_ip }}
+          - **Backend API**: http://${{ steps.outputs.outputs.backend_ip }}:5000
+          - **Health Check**: http://${{ steps.outputs.outputs.backend_ip }}:5000/health
+          
+          ### Login Credentials
+          - **Email**: admin@talentforge.com
+          - **Password**: Password123
+          
+          ### Infrastructure
+          - 🌐 VPC with public/private subnets
+          - 💻 2x EC2 instances (t2.micro)
+          - 🗄️ RDS MySQL (db.t3.micro)
+          - 📦 S3 bucket for uploads
+          - 🔐 IAM roles and security groups
+          
+          **Note**: Wait 5-10 minutes for user data scripts to complete initialization.
+          EOF
+
+  terraform-destroy:
+    name: Terraform Destroy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: destroy  # Requires manual approval
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Destroy
+        run: |
+          terraform destroy \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
+            -auto-approve
+        env:
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+
+      - name: Destroy Complete
+        run: |
+          echo "🗑️ All infrastructure destroyed"
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🗑️ Infrastructure Destroyed
+          
+          All AWS resources have been successfully destroyed:
+          - ✅ EC2 instances terminated
+          - ✅ RDS database deleted
+          - ✅ S3 bucket emptied and deleted
+          - ✅ VPC and networking resources removed
+          - ✅ IAM roles and security groups deleted
+          EOF

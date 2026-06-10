@@ -17,3 +17,8 @@ variable "instance_profile_name" {
 variable "key_name" {
   type = string
 }
+
+variable "backend_ip" {
+  type        = string
+  description = "Private IP of backend EC2 instance for API proxy"
+}

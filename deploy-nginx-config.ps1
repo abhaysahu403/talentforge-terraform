@@ -1,0 +1,89 @@
+# Deploy updated nginx configuration to Frontend EC2
+# This script copies the nginx config and reloads the container
+
+$nginxConfig = @'
+server {
+    listen       80;
+    server_name  _;
+
+    root   /usr/share/nginx/html;
+    index  index.html;
+
+    # Enable gzip compression
+    gzip            on;
+    gzip_vary       on;
+    gzip_proxied    any;
+    gzip_comp_level 6;
+    gzip_types      text/plain text/css text/xml application/json
+                    application/javascript application/rss+xml
+                    application/atom_xml image/svg+xml;
+
+    # Security headers
+    add_header X-Frame-Options          "SAMEORIGIN"  always;
+    add_header X-XSS-Protection         "1; mode=block" always;
+    add_header X-Content-Type-Options   "nosniff"     always;
+    add_header Referrer-Policy          "strict-origin-when-cross-origin" always;
+    
+    # Override localhost:5000 with backend proxy
+    sub_filter 'http://localhost:5000/api' '/api';
+    sub_filter_once off;
+    sub_filter_types application/javascript;
+
+    # Proxy API requests to backend
+    location /api/ {
+        proxy_pass http://3.230.115.251:5000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        
+        # CORS headers for local frontend calling backend
+        add_header 'Access-Control-Allow-Origin' 'http://100.55.88.10' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+        
+        if ($request_method = 'OPTIONS') {
+            return 204;
+        }
+    }
+
+    # Cache static assets aggressively (CRA hashes filenames)
+    location /static/ {
+        expires     1y;
+        add_header  Cache-Control "public, immutable";
+        access_log  off;
+    }
+
+    # Never cache index.html — browser must always fetch latest
+    location = /index.html {
+        add_header  Cache-Control "no-cache, no-store, must-revalidate";
+        add_header  Pragma "no-cache";
+        add_header  Expires "0";
+    }
+
+    # React Router: all routes fall back to index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Health check endpoint
+    location = /healthz {
+        return 200 "OK\n";
+        add_header Content-Type text/plain;
+        access_log off;
+    }
+}
+'@
+
+Write-Host "Nginx configuration ready. Please run these commands manually on Frontend EC2:" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "ssh -i AbhayOrg.pem ubuntu@100.55.88.10" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Then paste this content into /tmp/default.conf and deploy it." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Configuration file saved to: nginx-frontend.conf" -ForegroundColor Green
